@@ -1,0 +1,4 @@
+[core]
+    remote = ac215-milestone3
+['remote "ac215-milestone3"']
+    url = gs://ac215-milestone3

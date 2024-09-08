@@ -1,0 +1,39 @@
+on:
+  workflow_dispatch:
+
+# reference:
+# https://github.com/google-github-actions/deploy-cloudrun?tab=readme-ov-file#usage
+
+jobs:
+  deploy-cloudrun:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+
+    steps:
+    - uses: 'actions/checkout@v4'
+
+    # reference:
+    # https://github.com/google-github-actions/auth?tab=readme-ov-file#service-account-key-json
+    - uses: 'google-github-actions/auth@v2'
+      with:
+        credentials_json: '${{ secrets.GOOGLE_CREDENTIALS }}'
+
+    - uses: 'google-github-actions/setup-gcloud@v2'
+    
+    - name: 'Copy model from gcs'
+      run: gcloud storage rsync -r gs://finetunned_760m_bloom/bloom_model_fusion ./src/api-service-2/model
+
+    - id: 'deploy'
+      uses: 'google-github-actions/deploy-cloudrun@v1'
+      with:
+        service: 'api-service-2'
+        source: ./src/api-service-2
+        #region: us-east1 # default region is us-central1
+        # default memory limit is 512 MiB:
+        # https://cloud.google.com/run/docs/configuring/services/memory-limits#setting
+        # Need > 4 GiB for this model (for which cloud run requires >= 2 CPUs)
+        # Default concurrency is 80 requests per instance; reduce to 2 for better auto-scaling
+        # Keep at least one cloud run instance on at all times to serve requests due to long cold-start time.
+        flags: "--cpu=2 --memory=8Gi --concurrency=2 --min-instances=1"

@@ -1,0 +1,10 @@
+services:
+  dvc:
+    build: .
+    environment:
+        GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/data-service-account
+    secrets:
+      - data-service-account
+    volumes:
+      - .:/workspace
+    working_dir: /workspace

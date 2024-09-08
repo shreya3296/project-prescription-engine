@@ -1,0 +1,93 @@
+services:
+  collect-nhs:
+    build: src/data
+    command: ./data/raw/training_data.json
+    volumes:
+      - ./data:/app/data
+    working_dir: /app
+
+## deprecated
+# train:
+#   build: deprecated/gpt35
+#   volumes:
+#     - ./data:/app/data
+#   environment:
+#     OPENAI_API_KEY:
+#     WANDB_API_KEY:
+
+  bloom:
+    build: src/embeddings_biobert
+    environment:
+      GCS_BUCKET_NAME: # defined in .env
+      GCS_PACKAGE_URI: # defined in .env
+      GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/data-service-account
+    volumes:
+      - ./src/embeddings_biobert:/app
+
+  data-age-sex:
+    build: src/data-age-sex
+    environment:
+      GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/data-service-account
+    volumes:
+      - ./src/data-age-sex:/app
+    command: data-age-sex.csv
+
+  embeddings_biobert:
+    build: src/embeddings_biobert
+    environment:
+      GCS_BUCKET_NAME: # defined in .env
+      GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/data-service-account
+      TRANSFORMERS_CACHE: /tmp
+    volumes:
+      - ./src/embeddings_biobert:/app
+      - ./data:/data
+    secrets:
+      - data-service-account
+
+  distill:
+    build: src/distill
+    environment:
+      GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/data-service-account
+      TRANSFORMERS_CACHE: /tmp
+    volumes:
+      - ./src/distill:/app
+      - ./data:/data
+    secrets:
+      - data-service-account
+
+  workflow:
+    build: src/workflow
+    environment:
+      GCS_BUCKET_NAME:
+      GOOGLE_APPLICATION_CREDENTIALS: /run/secrets/data-service-account
+      STAGING_BUCKET:
+    secrets:
+      - data-service-account
+    volumes:
+      - ./src:/app
+  
+  api:
+    build:
+      context: src/api-service-2
+      # renamed so Google Cloud Build uses source build (buildpack)
+      dockerfile: Dockerfile-service
+    environment:
+      TRANSFORMERS_CACHE: /transformers_cache
+      PORT: "8080"
+    ports:
+      - "8080:8080"
+    volumes:
+      - transformers_cache:/transformers_cache
+      - ./src/api-service-2:/app
+
+  frontend-simple:
+    build: src/frontend-simple
+    volumes:
+      - ./src:/app
+
+secrets:
+  data-service-account:
+    file: ../secrets/data-service-account.json
+
+volumes:
+  transformers_cache:

@@ -1,0 +1,32 @@
+# prerequisites:
+# 1. Set up service account key with "Artifact Registry Repository Administrator" access:
+#  (NOTE: "Artifact Registry Writer" appears to be insufficient)
+#  https://cloud.google.com/artifact-registry/docs/docker/authentication#json-key
+# 2. Add GitHub repository secret GOOGLE_CREDENTIALS
+# 3. Modify IMAGE_TAG environment variable to reflect an appropriate Google Artifact Registry
+#    image writable by the service account
+name: Build and push data-sex-age
+
+on:
+  push:
+    paths: ['src/data-sex-age/**']
+  workflow_dispatch:
+
+env:
+  IMAGE_TAG: us-central1-docker.pkg.dev/ac215-404112/ac215/data-sex-age:latest
+  BUILD_CONTEXT: src/data-age-sex
+
+jobs:
+  build-and-push-image:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Login to container registry
+        run: echo '${{ secrets.GOOGLE_CREDENTIALS }}' | docker login -u _json_key --password-stdin ${IMAGE_TAG%%/*}
+      - name: Build container image
+        run: docker build -t ${IMAGE_TAG} ${BUILD_CONTEXT}
+# run only for commits pushed to / workflow_dispatch run on the default branch
+      - name: Publish container image
+        if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+        run: docker push ${{ env.IMAGE_TAG }}

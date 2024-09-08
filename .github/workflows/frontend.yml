@@ -1,0 +1,50 @@
+# Build frontend & deploy to GitHub Pages
+on:
+  push:
+    paths: ['src/frontend/**']
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          # node >= 17 has issue w/ pinned postcss version: https://github.com/postcss/postcss/issues/1663
+          node-version: "16.x"
+          # https://github.com/actions/setup-node?tab=readme-ov-file#caching-global-packages-data
+          cache: npm
+          cache-dependency-path: src/frontend/package-lock.json
+      - name: Install dependencies
+        run: cd src/frontend && npm ci
+      - name: Build
+        # need CI=false to avoid warnings being treated as errors
+        run: cd src/frontend && CI=false npm run build
+      - name: Upload site
+        if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+        uses: actions/upload-pages-artifact@v2
+        with:
+          path: src/frontend/build
+      - name: Deploy to GitHub Pages
+        if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+        uses: actions/upload-pages-artifact@v2
+        with:
+          path: src/frontend/build
+
+  
+  # reference: https://github.com/actions/deploy-pages?tab=readme-ov-file#usage
+  deploy:
+    runs-on: ubuntu-latest
+    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    needs: build
+    permissions:
+      pages: write      # to deploy to Pages
+      id-token: write   # to verify the deployment originates from an appropriate source
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v3
